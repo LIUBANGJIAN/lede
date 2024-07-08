@@ -1,4 +1,5 @@
 REQUIRE_IMAGE_METADATA=1
+RAMFS_COPY_BIN='fitblk'
 
 asus_initial_setup()
 {
@@ -23,17 +24,16 @@ platform_do_upgrade() {
 	bananapi,bpi-r3|\
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-poe)
-		local rootdev="$(cmdline_get_var root)"
-		rootdev="${rootdev##*/}"
-		rootdev="${rootdev%p[0-9]*}"
-		case "$rootdev" in
+		[ -e /dev/fit0 ] && fitblk /dev/fit0
+		[ -e /dev/fitrw ] && fitblk /dev/fitrw
+		bootdev="$(fitblk_get_bootdev)"
+		case "$bootdev" in
 		mmc*)
-			CI_ROOTDEV="$rootdev"
-			CI_KERNPART="production"
+			EMMC_KERN_DEV="/dev/$bootdev"
 			emmc_do_upgrade "$1"
 			;;
 		mtdblock*)
-			PART_NAME="fit"
+			PART_NAME="/dev/mtd${bootdev:8}"
 			default_do_upgrade "$1"
 			;;
 		ubiblock*)
@@ -45,6 +45,7 @@ platform_do_upgrade() {
 	cmcc,rax3000m-emmc|\
 	glinet,gl-mt2500|\
 	glinet,gl-mt6000|\
+	hf,m7986r1-emmc|\
 	jdcloud,re-cs-05)
 		CI_KERNPART="kernel"
 		CI_ROOTPART="rootfs"
@@ -97,6 +98,7 @@ platform_copy_config() {
 	cmcc,rax3000m-emmc|\
 	glinet,gl-mt2500|\
 	glinet,gl-mt6000|\
+	hf,m7986r1-emmc|\
 	jdcloud,re-cs-05)
 		emmc_copy_config
 		;;
