@@ -145,7 +145,7 @@ jobs:
           CONFIG_TARGET_x86_64_Generic=y
           CONFIG_HAS_TESTING_KERNEL=y
           CONFIG_TESTING_KERNEL=y
-          ###CONFIG_LINUX_6_6=y
+          CONFIG_LINUX_6_6=y
           EOF
           # 镜像设置:
           # cat >> .config <<EOF
