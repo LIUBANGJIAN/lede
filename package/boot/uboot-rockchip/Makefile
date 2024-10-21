@@ -312,6 +312,13 @@ define U-Boot/sige7-rk3588
     armsom_sige7
 endef
 
+define U-Boot/nanopc-t6-rk3588
+  $(U-Boot/Default/rk3588)
+  NAME:=NanoPC T6
+  BUILD_DEVICES:= \
+    friendlyarm_nanopc-t6
+endef
+
 # RK3588S boards
 
 define U-Boot/nanopi-r6c-rk3588s
