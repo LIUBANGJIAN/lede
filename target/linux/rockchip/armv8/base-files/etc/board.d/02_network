@@ -11,6 +11,7 @@ rockchip_setup_interfaces()
 	advantech,rsb4810|\
 	ariaboard,photonicat|\
 	dilusense,dlfr100|\
+	cyber,cyber3588-aib|\
 	ezpro,mrkaio-m68s|\
 	ezpro,mrkaio-m68s-plus|\
 	friendlyarm,nanopi-r2c|\
@@ -98,6 +99,7 @@ rockchip_setup_macs()
 	advantech,rsb4810|\
 	ariaboard,photonicat|\
 	codinge,xiaobao-nas-v1|\
+	cyber,cyber3588-aib|\
 	dilusense,dlfr100|\
 	ezpro,mrkaio-m68s|\
 	ezpro,mrkaio-m68s-plus|\

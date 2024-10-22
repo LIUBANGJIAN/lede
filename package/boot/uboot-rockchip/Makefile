@@ -312,6 +312,13 @@ define U-Boot/sige7-rk3588
     armsom_sige7
 endef
 
+define U-Boot/cyber3588-aib-rk3588
+  $(U-Boot/Default/rk3588)
+  NAME:=Cyber3588 AIB
+  BUILD_DEVICES:= \
+    cyber_cyber3588-aib
+endef
+
 define U-Boot/nanopc-t6-rk3588
   $(U-Boot/Default/rk3588)
   NAME:=NanoPC T6
