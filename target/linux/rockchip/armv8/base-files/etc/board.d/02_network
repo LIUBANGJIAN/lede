@@ -41,6 +41,7 @@ rockchip_setup_interfaces()
 	radxa,e25|\
 	seewo,sv21|\
 	rumu3f,fine-3399|\
+	xunlong,orangepi-5-plus|\
 	widora,mangopi-m28k|\
 	widora,mangopi-m28k-pro)
 		ucidef_set_interfaces_lan_wan 'eth0' 'eth1'
@@ -135,6 +136,7 @@ rockchip_setup_macs()
 		wan_mac=$(nanopi_r4s_get_mac wan)
 		lan_mac=$(nanopi_r4s_get_mac lan)
 		;;
+	friendlyarm,nanopi-r3s|\
 	friendlyarm,nanopi-r5c|\
 	friendlyarm,nanopi-r5s|\
 	friendlyarm,nanopi-r6c|\

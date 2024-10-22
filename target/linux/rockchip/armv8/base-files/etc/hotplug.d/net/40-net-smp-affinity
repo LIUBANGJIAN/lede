@@ -40,6 +40,7 @@ widora,mangopi-m28k-pro)
 	;;
 firefly,rk3568-roc-pc|\
 friendlyarm,nanopc-t6|\
+friendlyarm,nanopi-r3s|\
 friendlyarm,nanopi-r5c|\
 friendlyarm,nanopi-r6c|\)
 	set_interface_core 2 "eth0"

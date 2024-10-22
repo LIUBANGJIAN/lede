@@ -178,6 +178,13 @@ define U-Boot/rk3566/Default
   TPL:=rk3566_ddr_1056MHz_v1.21.bin
 endef
 
+define U-Boot/nanopi-r3s-rk3566
+  $(U-Boot/rk3566/Default)
+  NAME:=NanoPi R3S
+  BUILD_DEVICES:= \
+    friendlyarm_nanopi-r3s
+endef
+
 define U-Boot/panther-x2-rk3566
   $(U-Boot/rk3566/Default)
   NAME:=Panther X2
@@ -302,6 +309,13 @@ define U-Boot/nanopc-t6-rk3588
     friendlyarm_nanopc-t6
 endef
 
+define U-Boot/orangepi-5-plus-rk3588
+  $(U-Boot/rk3588/Default)
+  NAME:=OrangePi 5 Plus
+  BUILD_DEVICES:= \
+    xunlong_orangepi-5-plus
+endef
+
 define U-Boot/sige7-rk3588
   $(U-Boot/rk3588/Default)
   NAME:=Sige7
@@ -339,7 +353,15 @@ define U-Boot/nanopi-r6s-rk3588s
     friendlyarm_nanopi-r6s
 endef
 
+define U-Boot/orangepi-5-rk3588s
+  $(U-Boot/rk3588/Default)
+  NAME:=OrangePi 5
+  BUILD_DEVICES:= \
+    xunlong_orangepi-5
+endef
+
 UBOOT_TARGETS := \
+  nanopi-r3s-rk3566 \
   panther-x2-rk3566 \
   rock-3c-rk3566 \
   bpi-r2-pro-rk3568 \
@@ -355,9 +377,11 @@ UBOOT_TARGETS := \
   station-p2-rk3568 \
   generic-rk3588 \
   nanopc-t6-rk3588 \
+  orangepi-5-plus-rk3588 \
   sige7-rk3588 \
   nanopi-r6c-rk3588s \
   nanopi-r6s-rk3588s \
+  orangepi-5-rk3588s \
   dlfr100-rk3399 \
   h3399pc-rk3399 \
   fine3399-rk3399 \
