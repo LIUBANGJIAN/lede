@@ -164,8 +164,8 @@ jobs:
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_x86_64_Generic=y
-          CONFIG_HAS_TESTING_KERNEL=y
-          #CONFIG_TESTING_KERNEL=y
+          #CONFIG_HAS_TESTING_KERNEL=y
+          CONFIG_TESTING_KERNEL=y
           #CONFIG_LINUX_6_6=y
           EOF
           # 镜像设置:
@@ -310,19 +310,19 @@ jobs:
       - name: Deliver buildinfo
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_buildinfo_6.6.x
+          name: OpenWrt_buildinfo_6.12.x
           path: ./artifact/buildinfo/
 
       - name: Deliver package
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_package_6.6.x
+          name: OpenWrt_package_6.12.x
           path: ./artifact/package/
 
       - name: Deliver firmware
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_firmware_6.6.x
+          name: OpenWrt_firmware_6.12.x
           path: ./bin/targets/
           
       - name: Upload release asset
