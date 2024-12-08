@@ -269,7 +269,7 @@ jobs:
           # CONFIG_TARGET_IMAGES_KERNEL is not set
           # CONFIG_VMDK_IMAGES is not set
           # CONFIG_TARGET_ROOTFS_INITRAMFS is not set
-          # CONFIG_TARGET_ROOTFS_SQUASHFS is not set
+          ## CONFIG_TARGET_ROOTFS_SQUASHFS is not set
           EOF
           # 
           # ========================固件定制部分结束========================
@@ -300,6 +300,8 @@ jobs:
           mkdir -p ./artifact/firmware
           mkdir -p ./artifact/package
           mkdir -p ./artifact/buildinfo
+          rm -rf $(find ./bin/targets/ -type f -name "openwrt-x86-64-generic-kernel.bin")
+          rm -rf $(find ./bin/targets/ -type f -name "openwrt-x86-64-generic-squashfs-rootfs.img")
           rm -rf $(find ./bin/targets/ -type d -name "packages")
           cp -rf $(find ./bin/targets/ -type f) ./artifact/firmware/
           cp -rf $(find ./bin/packages/ -type f -name "*.ipk") ./artifact/package/
@@ -324,7 +326,7 @@ jobs:
       - name: Deliver firmware
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_firmware_6.12.x
+          name: OpenWrt_firmware_6.12.x          
           path: ./bin/targets/
           retention-days: 15
           compression-level: 9
