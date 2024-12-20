@@ -817,6 +817,19 @@ err_free_opp:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0)
+static void rk3328_dmcfreq_remove(struct platform_device *pdev)
+{
+	struct rk3328_dmcfreq *dmcfreq = dev_get_drvdata(&pdev->dev);
+
+	/*
+	 * Before remove the opp table we need to unregister the opp notifier.
+	 */
+	devm_devfreq_unregister_opp_notifier(dmcfreq->dev, dmcfreq->devfreq);
+	dev_pm_opp_of_remove_table(dmcfreq->dev);
+
+}
+#else
 static int rk3328_dmcfreq_remove(struct platform_device *pdev)
 {
 	struct rk3328_dmcfreq *dmcfreq = dev_get_drvdata(&pdev->dev);
@@ -829,6 +842,7 @@ static int rk3328_dmcfreq_remove(struct platform_device *pdev)
 
 	return 0;
 }
+#endif
 
 static const struct of_device_id rk3328dmc_devfreq_of_match[] = {
 	{ .compatible = "rockchip,rk3328-dmc" },
