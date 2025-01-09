@@ -238,7 +238,7 @@ jobs:
           CONFIG_PACKAGE_luci-app-ssr-plus=y
           CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-mihomo=y
-          CONFIG_PACKAGE_luci-app-wireguard
+          CONFIG_PACKAGE_luci-app-wireguard=y
           EOF
           # LuCI主题:
           # #cat >> .config <<EOF
