@@ -239,6 +239,7 @@ jobs:
           CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-mihomo=y
           CONFIG_PACKAGE_luci-app-wireguard=y
+          CONFIG_PACKAGE_luci-proto-wireguard=y
           EOF
           # LuCI主题:
           # #cat >> .config <<EOF
