@@ -237,13 +237,16 @@ jobs:
           CONFIG_PACKAGE_luci-app-alist=y
           CONFIG_PACKAGE_luci-app-lucky=y
           CONFIG_PACKAGE_luci-app-frps=y
-          CONFIG_PACKAGE_luci-app-openclash=y
-          CONFIG_PACKAGE_luci-app-ssr-plus=y
+          #CONFIG_PACKAGE_luci-app-openclash=y
+          #CONFIG_PACKAGE_luci-app-ssr-plus=y
           CONFIG_PACKAGE_luci-app-passwall=y
-          CONFIG_PACKAGE_luci-app-mihomo=y
-          #CONFIG_PACKAGE_luci-app-wireguard=y
+          #CONFIG_PACKAGE_luci-app-mihomo=y
           #CONFIG_PACKAGE_luci-proto-wireguard=y
+          CONFIG_PACKAGE_luci-app-ddns=n
+          CONFIG_PACKAGE_luci-app-vsftpd=n
+          CONFIG_PACKAGE_luci-app-accesscontrol=n
           EOF
+          
           # LuCI主题:
           # #cat >> .config <<EOF
           # #CONFIG_PACKAGE_luci-theme-argon=y
