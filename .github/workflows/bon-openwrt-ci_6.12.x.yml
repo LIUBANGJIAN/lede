@@ -320,7 +320,7 @@ jobs:
         with:
           name: OpenWrt_buildinfo_6.12.x
           path: ./artifact/buildinfo/
-          retention-days: 15
+          retention-days: 7
           compression-level: 9
 
       - name: Deliver package
@@ -328,15 +328,15 @@ jobs:
         with:
           name: OpenWrt_package_6.12.x
           path: ./artifact/package/
-          retention-days: 15
+          retention-days: 7
           compression-level: 9
 
       - name: Deliver firmware
         uses: actions/upload-artifact@v4
         with:
-name: OpenWrt_firmware_6.12.x
+          name: OpenWrt_firmware_6.12.x
           path: ./bin/targets/
-          retention-days: 15
+          retention-days: 7
           compression-level: 9
 
       - name: Upload release asset
