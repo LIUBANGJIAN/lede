@@ -240,9 +240,9 @@ jobs:
           CONFIG_PACKAGE_luci-app-vsftpd=n
           CONFIG_PACKAGE_luci-app-accesscontrol=n
           CONFIG_PACKAGE_luci-app-ssr-plus=n
-          #CONFIG_PACKAGE_luci-app-alist=y
-          #CONFIG_PACKAGE_luci-app-lucky=y
-          #CONFIG_PACKAGE_luci-app-frps=y
+          CONFIG_PACKAGE_luci-app-alist=y
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-frps=y
           #CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-wireguard=y
           CONFIG_PACKAGE_luci-proto-wireguard=y
