@@ -113,14 +113,15 @@ jobs:
 
       - name: Update feeds
         run: |
-          ###sed -i '1i src-git kenzo https://github.com/kenzok8/openwrt-packages' feeds.conf.default
-          sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
-          sed -i '2i src-git alist https://github.com/sbwml/luci-app-alist' feeds.conf.default
-          sed -i '3i src-git small https://github.com/kenzok8/small' feeds.conf.default
-          sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
-          ####sed -i '4i src-git mihomo https://github.com/morytyann/OpenWrt-mihomo' feeds.conf.default
+          sed -i '1i src-git kenzo https://github.com/kenzok8/openwrt-packages' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          sed -i '3i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
+          sed -i '4i src-git alist https://github.com/sbwml/luci-app-alist' feeds.conf.default          
+          sed -i '5i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
+
           ./scripts/feeds update -a && rm -rf feeds/luci/applications/luci-app-mosdns
-          rm -rf feeds/packages/net/{alist,adguardhome,xray*,v2ray*,v2ray*,sing*,smartdns}
+          rm -rf feeds/packages/net/{alist,adguardhome,mosdns,xray*,v2ray*,v2ray*,sing*,smartdns}
+          rm -rf feeds/packages/utils/v2dat
           rm -rf feeds/packages/lang/golang
           git clone https://github.com/kenzok8/golang feeds/packages/lang/golang
           ./scripts/feeds install -a
@@ -230,6 +231,7 @@ jobs:
           # CONFIG_PACKAGE_luci-app-frpc=y
           # CONFIG_PACKAGE_luci-app-openclash=n
           # CONFIG_PACKAGE_luci-app-mihomo=y
+          #CONFIG_PACKAGE_luci-app-frps=y
           CONFIG_PACKAGE_luci-app-aliyundrive-webdav=n
           CONFIG_PACKAGE_luci-app-adbyby-plus=n
           CONFIG_PACKAGE_luci-app-unblockmusic=n
@@ -240,10 +242,10 @@ jobs:
           CONFIG_PACKAGE_luci-app-vsftpd=n
           CONFIG_PACKAGE_luci-app-accesscontrol=n
           CONFIG_PACKAGE_luci-app-ssr-plus=n
+          CONFIG_PACKAGE_luci-app-vlmcsd=n
           CONFIG_PACKAGE_luci-app-alist=y
           CONFIG_PACKAGE_luci-app-lucky=y
-          CONFIG_PACKAGE_luci-app-frps=y
-          #CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-wireguard=y
           CONFIG_PACKAGE_luci-proto-wireguard=y
           EOF
