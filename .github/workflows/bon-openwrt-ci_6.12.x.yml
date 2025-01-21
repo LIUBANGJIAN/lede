@@ -119,7 +119,7 @@ jobs:
           sed -i '4i src-git alist https://github.com/sbwml/luci-app-alist' feeds.conf.default
           sed -i '5i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
           sed -i '6i src-git passwall https://github.com/xiaorouji/openwrt-passwall.git' feeds.conf.default
-          sed -i '6i src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git' feeds.conf.default
+          sed -i '7i src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git' feeds.conf.default
           #./scripts/feeds update -a && rm -rf feeds/luci/applications/luci-app-mosdns
           #rm -rf feeds/packages/net/{alist,adguardhome,mosdns,xray*,v2ray*,v2ray*,sing*,smartdns}
           #rm -rf feeds/packages/utils/v2dat
