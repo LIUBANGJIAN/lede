@@ -1,0 +1,97 @@
+--- a/arch/arm64/boot/dts/qcom/ipq6018.dtsi
++++ b/arch/arm64/boot/dts/qcom/ipq6018.dtsi
+@@ -43,7 +43,6 @@
+ 			clocks = <&apcs_glb APCS_ALIAS0_CORE_CLK>;
+ 			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu_opp_table>;
+-			cpu-supply = <&ipq6018_s2>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -56,7 +55,6 @@
+ 			clocks = <&apcs_glb APCS_ALIAS0_CORE_CLK>;
+ 			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu_opp_table>;
+-			cpu-supply = <&ipq6018_s2>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -69,7 +67,6 @@
+ 			clocks = <&apcs_glb APCS_ALIAS0_CORE_CLK>;
+ 			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu_opp_table>;
+-			cpu-supply = <&ipq6018_s2>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -82,7 +79,6 @@
+ 			clocks = <&apcs_glb APCS_ALIAS0_CORE_CLK>;
+ 			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu_opp_table>;
+-			cpu-supply = <&ipq6018_s2>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -171,20 +167,6 @@
+ 				compatible = "qcom,rpm-ipq6018";
+ 				qcom,glink-channels = "rpm_requests";
+ 
+-				regulators {
+-					compatible = "qcom,rpm-mp5496-regulators";
+-
+-					ipq6018_s2: s2 {
+-						regulator-min-microvolt = <725000>;
+-						regulator-max-microvolt = <1062500>;
+-						regulator-always-on;
+-					};
+-
+-					ipq6018_l2: l2 {
+-						regulator-min-microvolt = <1800000>;
+-						regulator-max-microvolt = <3300000>;
+-					};
+-				};
+ 			};
+ 		};
+ 	};
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/ipq6018-mp5496.dtsi
+@@ -0,0 +1,39 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++&rpm_requests {
++	regulators {
++		compatible = "qcom,rpm-mp5496-regulators";
++
++		ipq6018_s2: s2 {
++			regulator-min-microvolt = <725000>;
++			regulator-max-microvolt = <1062500>;
++			regulator-always-on;
++		};
++
++		ipq6018_l2: l2 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++};
++
++&sdhc {
++	vqmmc-supply = <&ipq6018_l2>;
++};
++
++&CPU0 {
++	cpu-supply = <&ipq6018_s2>;
++};
++
++&CPU1 {
++	cpu-supply = <&ipq6018_s2>;
++};
++
++&CPU2 {
++	cpu-supply = <&ipq6018_s2>;
++};
++
++&CPU3 {
++	cpu-supply = <&ipq6018_s2>;
++};
