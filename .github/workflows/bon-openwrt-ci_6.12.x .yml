@@ -246,8 +246,8 @@ jobs:
           CONFIG_PACKAGE_luci-app-ssr-plus=n
           CONFIG_PACKAGE_luci-app-vlmcsd=n
           CONFIG_PACKAGE_luci-app-alist=y
-          ####CONFIG_PACKAGE_luci-app-lucky=y
-          ####CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-wireguard=y
           CONFIG_PACKAGE_luci-proto-wireguard=y
           CONFIG_PACKAGE_luci-app-ttyd=y
