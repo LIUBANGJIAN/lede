@@ -124,8 +124,8 @@ jobs:
           rm -rf feeds/packages/net/{alist,adguardhome,mosdns,xray*,v2ray*,v2ray*,sing*,smartdns}
           rm -rf feeds/packages/utils/v2dat
           rm -rf feeds/packages/lang/golang
-          #git clone https://github.com/kenzok8/golang feeds/packages/lang/golang
-          git clone https://github.com/kenzok8/golang -b 1.22 feeds/packages/lang/golang
+          git clone https://github.com/kenzok8/golang feeds/packages/lang/golang
+          ####git clone https://github.com/kenzok8/golang -b 1.22 feeds/packages/lang/golang
           ./scripts/feeds install -a
           cat ./feeds.conf.default
 
@@ -246,7 +246,7 @@ jobs:
           CONFIG_PACKAGE_luci-app-ssr-plus=n
           CONFIG_PACKAGE_luci-app-vlmcsd=n
           ####CONFIG_PACKAGE_luci-app-alist=y
-          #####CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-lucky=y
           CONFIG_PACKAGE_luci-app-passwall=y
           CONFIG_PACKAGE_luci-app-wireguard=y
           CONFIG_PACKAGE_luci-proto-wireguard=y
