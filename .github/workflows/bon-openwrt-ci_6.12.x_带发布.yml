@@ -7,7 +7,7 @@
 # https://github.com/KFERMercer/OpenWrt-CI
 #
 
-name: OpenWrt_open-vm-tools_6.12.x
+name: OpenWrt_open-vm-tools_6.12.x_发布版
 
 on:
   push:
