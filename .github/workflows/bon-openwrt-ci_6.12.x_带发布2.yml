@@ -7,7 +7,7 @@
 # <https://github.com/KFERMercer/OpenWrt-CI>
 #
 
-name: OpenWrt_open-vm-tools_6.12.x
+name: OpenWrt_open-vm-tools_6.12.x_带发布2
 
 on:
   push:
@@ -350,7 +350,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.YOURTOKEN }}
-          file: ./artifact/firmware/*
+          file: ./bin/targets/*
           tag: ${{ github.ref }}
           file_glob: true
 
