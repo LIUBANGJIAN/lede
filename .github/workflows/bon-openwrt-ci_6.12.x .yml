@@ -278,9 +278,9 @@ jobs:
           CONFIG_PACKAGE_iftop=y
           CONFIG_PACKAGE_tcpdump=y
           CONFIG_PACKAGE_pv=y
-          CONFIG_PACKAGE_wg-installer-server-hotplug-babeld=y
-          CONFIG_PACKAGE_wg-installer-client=y
-          CONFIG_PACKAGE_wg-installer-server=y
+          #CONFIG_PACKAGE_wg-installer-server-hotplug-babeld=y
+          #CONFIG_PACKAGE_wg-installer-client=y
+          #CONFIG_PACKAGE_wg-installer-server=y
           #####CONFIG_PACKAGE_wg_wormhole=y
           EOF
           # 取消编译VMware镜像以及镜像填充 (不要删除被缩进的注释符号):
