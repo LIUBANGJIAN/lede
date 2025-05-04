@@ -86,6 +86,7 @@ jobs:
           # mkdir openwrt-package
           # cd openwrt-package
           cd lean
+          git clone https://github.com/LIUBANGJIAN/openwrt_wg_wormhole
           # git clone https://github.com/vernesong/OpenClash.git
           # git clone https://github.com/rufengsuixing/luci-app-adguardhome.git
           # git clone https://github.com/srchack/custom-packages.git && mv custom-packages/open-vm-tools package && rm -rf custom-packages
@@ -281,7 +282,7 @@ jobs:
           #CONFIG_PACKAGE_wg-installer-server-hotplug-babeld=y
           #CONFIG_PACKAGE_wg-installer-client=y
           #CONFIG_PACKAGE_wg-installer-server=y
-          #####CONFIG_PACKAGE_wg_wormhole=y
+          CONFIG_PACKAGE_wg_wormhole=y
           EOF
           # 取消编译VMware镜像以及镜像填充 (不要删除被缩进的注释符号):
           cat >> .config <<EOF
