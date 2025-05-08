@@ -290,6 +290,11 @@ menu "Target Images"
 		depends on TARGET_x86 || TARGET_armvirt || TARGET_armsr || TARGET_loongarch64 || TARGET_phytium
 		default "ttyS0"
 
+	config TARGET_SERIAL
+		string "Serial port device"
+		depends on TARGET_x86 || TARGET_armsr || TARGET_loongarch64 || TARGET_phytium
+		default "ttyS0"
+
 	config TARGET_IMAGES_GZIP
 		bool "GZip images"
 		depends on TARGET_ROOTFS_EXT4FS || TARGET_x86 || TARGET_armvirt || TARGET_armsr || TARGET_malta || TARGET_loongarch64
@@ -304,6 +309,7 @@ menu "Target Images"
 		int "Kernel partition size (in MiB)"
 		depends on USES_BOOT_PART
 		default 8 if TARGET_apm821xx_sata
+		default 128 if TARGET_armsr
 		default 64 if TARGET_bcm27xx
 		default 128 if TARGET_armvirt
 		default 128 if TARGET_armsr
