@@ -249,7 +249,7 @@ jobs:
           CONFIG_PACKAGE_luci-app-accesscontrol=n
           CONFIG_PACKAGE_luci-app-ssr-plus=n
           CONFIG_PACKAGE_luci-app-vlmcsd=n
-          CONFIG_PACKAGE_luci-app-openlist2=y
+          CONFIG_PACKAGE_luci-app-openlist=y
           CONFIG_PACKAGE_luci-app-lucky=y
           CONFIG_PACKAGE_luci-app-passwall=y
           ####CONFIG_PACKAGE_luci-app-passwall2=y
