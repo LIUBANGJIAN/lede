@@ -307,23 +307,23 @@ jobs:
           find ./dl/ -size -1024c -exec rm -f {} \;
           df -h
 
-      - name: Compile firmware
+      - name: Compile the firmware
+        id: compile
         run: |
-          # make -j$(nproc) || make -j16 V=s
-          make -j$(nproc)
-          bash <(curl -Ls https://raw.githubusercontent.com/szdosar/ish/refs/heads/master/fix_singbox_ech_stub.sh)
-          make package/feeds/small/sing-box/compile V=s
-          make package/feeds/packages/geoview/{clean,compile}
-          make -j$(nproc)
-          echo "======================="
-          echo "Space usage:"
-          echo "======================="
-          df -h
-          echo "======================="
-          du -h --max-depth=1 ./ --exclude=build_dir --exclude=bin
-          du -h --max-depth=1 ./build_dir
-          du -h --max-depth=1 ./bin
-
+         cd openwrt
+         echo -e "$(nproc) thread compile"
+         #make -j$(nproc) || make -j1 || make -j1 V=s
+         bash <(curl -Ls https://raw.githubusercontent.com/szdosar/ish/refs/heads/master/fix_singbox_init.sh)
+         make -j$(nproc) || true
+         bash <(curl -Ls https://raw.githubusercontent.com/szdosar/ish/refs/heads/master/fix_singbox_ech_stub.sh) || true
+         make package/feeds/small/sing-box/compile || true
+         make package/feeds/packages/geoview/compile || true
+         make -j$(nproc)
+         echo "status=success" >> $GITHUB_OUTPUT
+         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+        
       - name: Prepare artifact
         run: |
           mkdir -p ./artifact/firmware
