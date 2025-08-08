@@ -309,7 +309,7 @@ jobs:
 
       - name: Compile firmware
         run: |
-          make -j$(nproc) || make -j16 V=s
+          # make -j$(nproc) || make -j16 V=s
           make -j$(nproc)
           bash <(curl -Ls https://raw.githubusercontent.com/szdosar/ish/refs/heads/master/fix_singbox_ech_stub.sh)
           make package/feeds/small/sing-box/compile V=s
