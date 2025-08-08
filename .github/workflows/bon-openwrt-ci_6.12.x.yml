@@ -276,7 +276,7 @@ jobs:
           # CONFIG_PACKAGE_ntfs3-oot=n
           # CONFIG_PACKAGE_mount=n
           # CONFIG_PACKAGE_server_box_monitor=y
-          CONFIG_SING_BOX_WITH_ECH is not set
+          CONFIG_SING_BOX_WITH_ECH=n
           CONFIG_PACKAGE_nano=y
           CONFIG_PACKAGE_open-vm-tools=y
           CONFIG_PACKAGE_iperf3=y
