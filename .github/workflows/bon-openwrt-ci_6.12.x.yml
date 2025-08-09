@@ -115,8 +115,8 @@ jobs:
         run: |
           #####sed -i '1i src-git kenzo https://github.com/kenzok8/openwrt-packages' feeds.conf.default
           sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
-          #####sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
-          sed -i '2i src-git passwall https://github.com/xiaorouji/openwrt-passwall' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          #####sed -i '2i src-git passwall https://github.com/xiaorouji/openwrt-passwall' feeds.conf.default
           #######sed -i '3i src-git alist https://github.com/sbwml/luci-app-alist' feeds.conf.default
           sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
           sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
@@ -277,7 +277,7 @@ jobs:
           # CONFIG_PACKAGE_ntfs3-oot=n
           # CONFIG_PACKAGE_mount=n
           # CONFIG_PACKAGE_server_box_monitor=y
-          # CONFIG_SING_BOX_WITH_ECH=n
+          CONFIG_SING_BOX_WITH_ECH=n
           CONFIG_PACKAGE_nano=y
           CONFIG_PACKAGE_open-vm-tools=y
           CONFIG_PACKAGE_iperf3=y
