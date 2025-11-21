@@ -121,6 +121,7 @@ jobs:
           sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
           sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
           sed -i '5i src-git taskplan https://github.com/sirpdboy/luci-app-taskplan' feeds.conf.default
+          sed -i '6i src-git rtp2httpd https://github.com/stackia/rtp2httpd.git' feeds.conf.default
           ####sed -i '5i src-git wg_wormhole https://github.com/LIUBANGJIAN/openwrt_wg_wormhole' feeds.conf.default
           ###########sed -i '6i src-git passwall https://github.com/xiaorouji/openwrt-passwall.git' feeds.conf.default
           ###########sed -i '7i src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git' feeds.conf.default
@@ -259,6 +260,7 @@ jobs:
           CONFIG_PACKAGE_luci-proto-wireguard=y
           CONFIG_PACKAGE_luci-app-ttyd=y
           CONFIG_PACKAGE_luci-app-taskplan=y
+          CONFIG_PACKAGE_luci-app-rtp2httpd=y
           EOF
           # LuCI主题:
           # #cat >> .config <<EOF
