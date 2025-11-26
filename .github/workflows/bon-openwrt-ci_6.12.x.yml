@@ -239,7 +239,7 @@ jobs:
           # CONFIG_PACKAGE_luci-app-adguardhome=y
           # CONFIG_PACKAGE_luci-app-netdata=y
           # CONFIG_PACKAGE_luci-app-frpc=y
-          CONFIG_PACKAGE_luci-app-openclash=y
+          #CONFIG_PACKAGE_luci-app-openclash=y
           # CONFIG_PACKAGE_luci-app-mihomo=y
           # CONFIG_PACKAGE_luci-app-frps=y
           CONFIG_PACKAGE_luci-app-aliyundrive-webdav=n
@@ -262,7 +262,7 @@ jobs:
           CONFIG_PACKAGE_luci-app-ttyd=y
           CONFIG_PACKAGE_luci-app-taskplan=y
           CONFIG_PACKAGE_luci-app-rtp2httpd=y
-          CONFIG_PACKAGE_luci-app-homeproxy=y
+          #CONFIG_PACKAGE_luci-app-homeproxy=y
           EOF
           # LuCI主题:
           # #cat >> .config <<EOF
