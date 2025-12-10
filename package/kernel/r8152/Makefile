@@ -29,12 +29,12 @@ define KernelPackage/usb-net-rtl8152-vendor
   CONFLICTS:=kmod-usb-net-rtl8152
 endef
 
-define KernelPackage/usb-net-rtl8152-vendor/description
-  Kernel module for Realtek Realtek USB 1G / 2.5G / 5G / 10G Ethernet Chipsets
+define KernelPackage/r8152/description
+  Kernel module for Realtek USB Ethernet Chipsets
 endef
 
 define Build/Compile
 	+$(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
 endef
 
-$(eval $(call KernelPackage,usb-net-rtl8152-vendor))
+$(eval $(call KernelPackage,r8152))
