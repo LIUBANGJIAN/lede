@@ -41,7 +41,6 @@ jobs:
           echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
           echo "CPU核心数量: $(nproc)"
           echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
-          go version
 
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
@@ -65,7 +64,6 @@ jobs:
           sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev scdoc
           sudo -E apt-get -y autoremove --purge
           sudo -E apt-get clean
-          # 1. 设置北京时间
           sudo -E timedatectl set-timezone "Asia/Shanghai"
 
       - name: Checkout Source
@@ -135,30 +133,32 @@ jobs:
           mkdir -p ./artifact/buildinfo
           mkdir -p ./artifact/release_upload
           
-          # 1. 复制所有固件到 artifact 目录 (保持你原来的全量逻辑)
-          # 注意：为了避免 find 匹配不到，先进入目录操作
-          cd bin/targets/x86/64/ || cd bin/targets/*/*
-          cp -f *.buildinfo *.manifest ../../../../artifact/buildinfo/ || true
-          # 排除中间层文件，只留镜像
-          cp -f *combined-efi.img* ../../../../artifact/firmware/ || true
+          # 1. 整理 Artifacts (全量保留)
+          # 递归搜寻所有符合条件的文件并移动
+          find bin/targets/ -type f -name "*.buildinfo" -o -name "*.manifest" | xargs -i cp -f {} ./artifact/buildinfo/
+          find bin/targets/ -type f -name "*combined-efi.img*" | xargs -i cp -f {} ./artifact/firmware/
+          find bin/packages/ -type f -name "*.ipk" | xargs -i cp -f {} ./artifact/package/
           
           # 2. 极致压缩 Release 专用固件
-          # 寻找 combined-efi.img 结尾的文件（忽略中间的日期版本号）
-          IMG_FILE=$(ls *combined-efi.img 2>/dev/null | head -n 1)
-          if [ -n "$IMG_FILE" ]; then
-            echo "正在压缩固件: $IMG_FILE"
-            xz -9 -c "$IMG_FILE" > ../../../../artifact/release_upload/openwrt-x86-64-generic-squashfs-combined-efi.img.xz
+          # 搜寻 combined-efi 镜像，无论它是 .img 还是 .img.gz
+          RAW_IMG=$(find bin/targets/ -type f -name "*combined-efi.img*")
+          if [ -n "$RAW_IMG" ]; then
+            echo "找到原始固件: $RAW_IMG"
+            # 如果原始文件是压缩的（如 .gz），先解压再用 xz 重新压缩
+            if [[ "$RAW_IMG" == *.gz ]]; then
+              zcat "$RAW_IMG" | xz -9 > ./artifact/release_upload/openwrt-x86-64-generic-squashfs-combined-efi.img.xz
+            else
+              xz -9 -c "$RAW_IMG" > ./artifact/release_upload/openwrt-x86-64-generic-squashfs-combined-efi.img.xz
+            fi
           else
-            echo "错误：未找到 efi 镜像文件！"
+            echo "错误：依然无法找到 efi 镜像文件，请检查编译配置！"
+            ls -R bin/targets/
             exit 1
           fi
           
-          # 3. 整理 IPK 插件包
-          cd ../../../../
-          cp -rf $(find ./bin/packages/ -type f -name "*.ipk") ./artifact/package/
+          # 3. 插件包打包压缩
           tar -cJf ./artifact/release_upload/packages-x86-64.tar.xz -C ./artifact/package .
 
-      # 发布到 Artifact (全量，保留你原来的步骤名和逻辑)
       - name: Deliver buildinfo
         uses: actions/upload-artifact@v4
         with:
@@ -188,7 +188,6 @@ jobs:
           echo "proxy_fw=${BASE_PROXY}/openwrt-x86-64-generic-squashfs-combined-efi.img.xz" >> $GITHUB_OUTPUT
           echo "proxy_pkg=${BASE_PROXY}/packages-x86-64.tar.xz" >> $GITHUB_OUTPUT
 
-      # 5. 删除旧的 Release
       - name: Remove old Releases
         uses: dev-drprasad/delete-older-releases@v0.3.3
         with:
@@ -197,7 +196,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2 & 3 & 4. 发布到 Release
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
         with:
