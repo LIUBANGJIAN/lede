@@ -1,59 +1,218 @@
 #
-# This is free software, licensed under the MIT License.
-# 
+# This is free software, lisence use MIT.
+#
+# Copyright (C) 2019 P3TERX <https://p3terx.com>
 # Copyright (C) 2019 KFERMercer <KFER.Mercer@gmail.com>
-# 
-# <https://github.com/KFERMercer/OpenWrt-CI>
 #
-# Updated: 2025 (Force Sync & Keep Workflows)
-#
-name: Merge-upstream-new
+
+name: OpenWrt_open-vm-tools_6.12.x_test
 
 on:
   push:
-    branches: 
+    branches:
       - master
   schedule:
-    - cron: '0 * * * *' # 每小时执行一次
-  workflow_dispatch: # 允许手动点击按钮触发
+    - cron: '0 */3 * * *'
+  release:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
-  merge:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        ref: master
-        fetch-depth: 0 # 必须获取全部历史以便找回文件
-        lfs: true
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
 
-    - name: Set git identity
-      run: |
-        git config --global user.email "KFER.Mercer@gmail.com"
-        git config --global user.name "KFERMercer"
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          check-latest: true
 
-    - name: Force sync upstream
-      run: |
-        # 1. 添加并拉取上游
-        git remote add upstream https://github.com/coolsnowwolf/lede.git
-        git fetch upstream master
-        
-        # 2. 强制将本地重置为上游状态（此时 .github/workflows 会被上游覆盖或删除）
-        git reset --hard upstream/master
-        
-        # 3. 关键步骤：从重置前的状态 (HEAD@{1}) 中恢复你的 workflow 文件夹
-        # 这保证了你现在的这个 yml 文件不会丢失
-        git checkout HEAD@{1} -- .github/workflows/
-        
-        # 4. 如果你有其他想要保留的文件（比如 README.md），取消下面这行的注释
-        # git checkout HEAD@{1} -- README.md
-        
-        # 5. 提交这些恢复的文件
-        git commit -m "Keep custom workflows after force sync" || echo "No changes to commit"
+      - name: 查看机器配置
+        run: |
+          echo "--------------------------CPU信息--------------------------"
+          echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
+          echo "CPU核心数量: $(nproc)"
+          echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
+          go version
 
-    - name: Push Commits
-      run: |
-        # 使用 --force 强制推送到你的 master 分支
-        git push origin master --force
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          temp-reserve-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Space cleanup
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/lib/jvm /etc/mysql /etc/php || true
+          sudo docker image prune --all --force || true
+          sudo -E apt-get update
+          sudo -E apt-get -y purge azure-cli* docker* ghc* zulu* llvm* firefox google* dotnet* powershell* openjdk* mysql* php* mongodb* snap* || true
+          sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev scdoc
+          sudo -E apt-get -y autoremove --purge
+          sudo -E apt-get clean
+          # 1. 设置北京时间
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Checkout Source
+        uses: actions/checkout@v4
+          
+      - name: Update feeds
+        run: |
+          sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
+          sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
+          sed -i '5i src-git taskplan https://github.com/sirpdboy/luci-app-taskplan' feeds.conf.default
+          sed -i '6i src-git rtp2httpd https://github.com/stackia/rtp2httpd.git' feeds.conf.default
+          sed -i '8i src-git netbird https://github.com/tbc0309/openwrt-netbird.git' feeds.conf.default
+          ./scripts/feeds update -a 
+          rm -rf feeds/luci/applications/luci-app-mosdns
+          rm -rf feeds/packages/net/{alist,openlist,adguardhome,mosdns,xray*,v2ray*,v2ray*,sing*,smartdns}
+          rm -rf feeds/packages/utils/v2dat
+          rm -rf feeds/packages/lang/golang
+          git clone --depth=1 -b 25.x https://github.com/sbwml/packages_lang_golang feeds/packages/lang/golang
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate configuration file
+        run: |
+          rm -f ./.config*
+          touch ./.config
+          cat >> .config <<EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_Generic=y
+          CONFIG_TESTING_KERNEL=n
+          CONFIG_PACKAGE_luci-app-frps=y
+          CONFIG_PACKAGE_luci-app-openlist2=y
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-wireguard=y
+          CONFIG_PACKAGE_luci-proto-wireguard=y
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_luci-app-taskplan=y
+          CONFIG_PACKAGE_luci-app-rtp2httpd=y
+          CONFIG_SING_BOX_WITH_ECH=y
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_open-vm-tools=y
+          CONFIG_PACKAGE_iperf3=y
+          CONFIG_PACKAGE_iftop=y
+          CONFIG_PACKAGE_tcpdump=y
+          CONFIG_PACKAGE_pv=y
+          CONFIG_PACKAGE_netbird=y
+          EOF
+          sed -i 's/^[ \t]*//g' ./.config
+          make defconfig
+
+      - name: Make download
+        run: |
+          make download -j8
+          find ./dl/ -size -1024c -exec rm -f {} \;
+
+      - name: Compile the firmware
+        run: |
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Prepare artifact & Release files
+        run: |
+          mkdir -p ./artifact/firmware
+          mkdir -p ./artifact/package
+          mkdir -p ./artifact/buildinfo
+          mkdir -p ./artifact/release_upload
+          
+          # 1. 复制所有固件到 artifact 目录 (保持你原来的全量逻辑)
+          # 注意：为了避免 find 匹配不到，先进入目录操作
+          cd bin/targets/x86/64/ || cd bin/targets/*/*
+          cp -f *.buildinfo *.manifest ../../../../artifact/buildinfo/ || true
+          # 排除中间层文件，只留镜像
+          cp -f *combined-efi.img* ../../../../artifact/firmware/ || true
+          
+          # 2. 极致压缩 Release 专用固件
+          # 寻找 combined-efi.img 结尾的文件（忽略中间的日期版本号）
+          IMG_FILE=$(ls *combined-efi.img 2>/dev/null | head -n 1)
+          if [ -n "$IMG_FILE" ]; then
+            echo "正在压缩固件: $IMG_FILE"
+            xz -9 -c "$IMG_FILE" > ../../../../artifact/release_upload/openwrt-x86-64-generic-squashfs-combined-efi.img.xz
+          else
+            echo "错误：未找到 efi 镜像文件！"
+            exit 1
+          fi
+          
+          # 3. 整理 IPK 插件包
+          cd ../../../../
+          cp -rf $(find ./bin/packages/ -type f -name "*.ipk") ./artifact/package/
+          tar -cJf ./artifact/release_upload/packages-x86-64.tar.xz -C ./artifact/package .
+
+      # 发布到 Artifact (全量，保留你原来的步骤名和逻辑)
+      - name: Deliver buildinfo
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_buildinfo_6.12.x
+          path: ./artifact/buildinfo/
+          compression-level: 9
+
+      - name: Deliver package
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_package_6.12.x
+          path: ./artifact/package/
+          compression-level: 9
+
+      - name: Deliver firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_firmware_6.12.x
+          path: ./artifact/firmware/
+          compression-level: 9
+
+      - name: Collect Release Info
+        id: info
+        run: |
+          echo "date=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
+          BASE_PROXY="https://gh-proxy.com/https://github.com/${{ github.repository }}/releases/download/Latest-Release"
+          echo "proxy_fw=${BASE_PROXY}/openwrt-x86-64-generic-squashfs-combined-efi.img.xz" >> $GITHUB_OUTPUT
+          echo "proxy_pkg=${BASE_PROXY}/packages-x86-64.tar.xz" >> $GITHUB_OUTPUT
+
+      # 5. 删除旧的 Release
+      - name: Remove old Releases
+        uses: dev-drprasad/delete-older-releases@v0.3.3
+        with:
+          keep_latest: 0
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2 & 3 & 4. 发布到 Release
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./artifact/release_upload/*
+          tag: Latest-Release
+          release_name: "OpenWrt X86 自动编译 [${{ steps.info.outputs.date }}]"
+          overwrite: true
+          file_glob: true
+          body: |
+            ## 🚀 编译完成 (北京时间: ${{ steps.info.outputs.date }})
+            
+            | 内容 | 极速下载链接 (gh-proxy) | 
+            | :--- | :--- | 
+            | **固件镜像 (.img.xz)** | [点击加速下载](${{ steps.info.outputs.proxy_fw }}) |
+            | **插件合集 (.tar.xz)** | [点击加速下载](${{ steps.info.outputs.proxy_pkg }}) |
+            
+            *提示：如果加速链接报错 404，请稍等一分钟待 GitHub 资源同步。*
