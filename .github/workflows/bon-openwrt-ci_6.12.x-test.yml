@@ -1,4 +1,4 @@
-name: OpenWrt_6.12.x_AutoBuild
+name: OpenWrt_open-vm-tools_6.12.x_Release
 
 on:
   push:
