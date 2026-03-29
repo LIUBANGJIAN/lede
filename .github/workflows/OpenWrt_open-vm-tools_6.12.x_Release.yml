@@ -1,0 +1,129 @@
+name: OpenWrt_open-vm-tools_6.12.x_Release
+
+on:
+  push:
+    branches: [ master ]
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout This Repo
+        uses: actions/checkout@v4
+
+      - name: Space cleanup & Timezone
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/lib/jvm /etc/mysql /etc/php || true
+          sudo -E apt-get update
+          sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev scdoc
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+
+      # 重要：克隆 OpenWrt 源码（以 Lean 为例，如果是其他源码请替换 URL）
+      - name: Clone source code
+        run: |
+          git clone --depth 1 https://github.com/coolsnowwolf/lede openwrt
+          
+      - name: Update feeds
+        working-directory: ./openwrt
+        run: |
+          sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
+          sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
+          sed -i '5i src-git taskplan https://github.com/sirpdboy/luci-app-taskplan' feeds.conf.default
+          sed -i '6i src-git rtp2httpd https://github.com/stackia/rtp2httpd.git' feeds.conf.default
+          sed -i '8i src-git netbird https://github.com/tbc0309/openwrt-netbird.git' feeds.conf.default
+          ./scripts/feeds update -a 
+          ./scripts/feeds install -a
+
+      - name: Generate configuration file
+        working-directory: ./openwrt
+        run: |
+          # 如果你有自己的 .config 文件放在仓库根目录，这里可以用 cp ../.config .config
+          cat >> .config <<EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_DEVICE_generic=y
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_open-vm-tools=y
+          # ... 其他插件按需添加
+          EOF
+          make defconfig
+
+      - name: Compile the firmware
+        working-directory: ./openwrt
+        run: |
+          make download -j8
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Prepare Files
+        id: prepare
+        run: |
+          mkdir -p ./artifact/firmware ./artifact/package ./artifact/buildinfo ./artifact/release_upload
+          
+          # 1. 搜集并压缩固件 (极致压缩)
+          # 使用 -L 穿透软链接，确保抓到实体文件
+          FIRMWARE_PATH=$(find openwrt/bin/targets/ -type f -name "*combined*efi.img*" | head -n 1)
+          if [ -n "$FIRMWARE_PATH" ]; then
+            echo "Found firmware: $FIRMWARE_PATH"
+            cp -L "$FIRMWARE_PATH" ./artifact/firmware/
+            # 重新进行高强度压缩
+            if [[ "$FIRMWARE_PATH" == *.gz ]]; then
+                zcat "$FIRMWARE_PATH" | xz -9 > ./artifact/release_upload/openwrt-x86-64-generic-combined-efi.img.xz
+            else
+                xz -9 -c "$FIRMWARE_PATH" > ./artifact/release_upload/openwrt-x86-64-generic-combined-efi.img.xz
+            fi
+          fi
+
+          # 2. 搜集并打包插件
+          find openwrt/bin/packages/ -type f -name "*.ipk" -exec cp -f {} ./artifact/package/ \;
+          tar -cJf ./artifact/release_upload/packages-x86-64.tar.xz -C ./artifact/package .
+          
+          # 3. 搜集 buildinfo
+          find openwrt/bin/targets/ -name "*.buildinfo" -o -name "*.manifest" -exec cp -f {} ./artifact/buildinfo/ \;
+
+      - name: Deliver Artifacts (Original Files)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_Full_Backup
+          path: ./artifact/
+
+      - name: Collect Release Info
+        id: info
+        run: |
+          echo "date=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
+          # 注意：这里的仓库路径要换成你自己的
+          BASE_PROXY="https://gh-proxy.com/https://github.com/${{ github.repository }}/releases/download/Latest-Release"
+          echo "proxy_fw=${BASE_PROXY}/openwrt-x86-64-generic-combined-efi.img.xz" >> $GITHUB_OUTPUT
+          echo "proxy_pkg=${BASE_PROXY}/packages-x86-64.tar.xz" >> $GITHUB_OUTPUT
+
+      - name: Remove old Releases
+        uses: dev-drprasad/delete-older-releases@v0.3.3
+        with:
+          keep_latest: 0
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./artifact/release_upload/*
+          tag: Latest-Release
+          release_name: "OpenWrt X86 自动编译 [${{ steps.info.outputs.date }}]"
+          overwrite: true
+          file_glob: true
+          body: |
+            ## 🚀 编译完成 (北京时间: ${{ steps.info.outputs.date }})
+            
+            - **固件镜像 (国内加速)**: [点击下载](${{ steps.info.outputs.proxy_fw }})
+            - **插件合集 (国内加速)**: [点击下载](${{ steps.info.outputs.proxy_pkg }})
