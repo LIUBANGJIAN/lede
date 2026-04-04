@@ -6,7 +6,7 @@
 # <https://github.com/KFERMercer/OpenWrt-CI>
 #
 # 2023年2月1日更新
-name: Merge-upstream-old
+name: Merge-upstream
 
 on:
   push:
