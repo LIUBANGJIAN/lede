@@ -1,0 +1,112 @@
+name: OpenWrt_open-vm-tools_6.12.x_Release
+
+on:
+  push:
+    branches: [ master ]
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout This Repo
+        uses: actions/checkout@v4
+
+      - name: Space cleanup & Timezone
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/lib/jvm /etc/mysql /etc/php || true
+          sudo -E apt-get update
+          sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev scdoc
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Clone source code
+        run: |
+          git clone --depth 1 https://github.com/coolsnowwolf/lede openwrt
+
+      - name: Update feeds
+        working-directory: ./openwrt
+        run: |
+          sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
+          sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
+          sed -i '5i src-git taskplan https://github.com/sirpdboy/luci-app-taskplan' feeds.conf.default
+          sed -i '6i src-git rtp2httpd https://github.com/stackia/rtp2httpd.git' feeds.conf.default
+          sed -i '8i src-git netbird https://github.com/tbc0309/openwrt-netbird.git' feeds.conf.default
+          ./scripts/feeds update -a 
+          ./scripts/feeds install -a
+
+      - name: Generate configuration file
+        working-directory: ./openwrt
+        run: |
+          cat >> .config <<EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_DEVICE_generic=y
+          # 核心功能与基础工具
+          CONFIG_SING_BOX_WITH_ECH=y
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_open-vm-tools=y
+          CONFIG_PACKAGE_iperf3=y
+          CONFIG_PACKAGE_iftop=y
+          CONFIG_PACKAGE_tcpdump=y
+          CONFIG_PACKAGE_pv=y
+          # 网络与组网
+          CONFIG_PACKAGE_netbird=y
+          CONFIG_PACKAGE_wireguard-tools=y
+          CONFIG_PACKAGE_luci-app-wireguard=y
+          CONFIG_PACKAGE_luci-proto-wireguard=y
+          # 应用插件
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-openlist2=y
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_luci-app-taskplan=y
+          CONFIG_PACKAGE_luci-app-rtp2httpd=y
+          CONFIG_PACKAGE_luci-app-frps=y
+          EOF
+          make defconfig
+
+      - name: Compile the firmware
+        working-directory: ./openwrt
+        run: |
+          make download -j8
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Prepare Files
+        id: prepare
+        run: |
+          mkdir -p ./artifact/release_upload
+          FIRMWARE_PATH=$(find openwrt/bin/targets/ -type f -name "*combined*efi.img*" | head -n 1)
+          if [ -n "$FIRMWARE_PATH" ]; then
+            xz -9 -c "$FIRMWARE_PATH" > ./artifact/release_upload/openwrt-6.12-x86-64-efi.img.xz
+          fi
+          tar -cJf ./artifact/release_upload/packages-6.12-x86.tar.xz -C openwrt/bin/packages/ .
+
+      - name: Collect Release Info
+        id: info
+        run: |
+          echo "date=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
+          BASE_PROXY="https://gh-proxy.com/https://github.com/${{ github.repository }}/releases/download/v6.12-Latest"
+          echo "proxy_fw=${BASE_PROXY}/openwrt-6.12-x86-64-efi.img.xz" >> $GITHUB_OUTPUT
+
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./artifact/release_upload/*
+          tag: v6.12-Latest
+          release_name: "OpenWrt X86 [6.12] - ${{ steps.info.outputs.date }}"
+          overwrite: true
+          file_glob: true
+          body: |
+            ## 🚀 6.12 编译完成
+            - **内核**: 默认
+            - **固件加速**: [下载地址](${{ steps.info.outputs.proxy_fw }})
