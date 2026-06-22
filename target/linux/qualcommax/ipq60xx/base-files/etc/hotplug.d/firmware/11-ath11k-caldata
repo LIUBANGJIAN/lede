@@ -23,6 +23,9 @@ case "$FIRMWARE" in
 	redmi,ax5-jdcloud)
 		caldata_extract_mmc "0:ART" 0x1000 0x10000
 		;;
+	philips,ly1800)
+		caldata_extract "0:ART" 0x1000 0x10000
+		;;
 	link,nn6000-v1|\
 	link,nn6000-v2)
 		caldata_extract_mmc "0:ART" 0x1000 0x10000
