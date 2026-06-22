@@ -27,6 +27,9 @@ zyxel,nbg7815)
 	[ -n "$idx" ] && \
 		ubootenv_add_uci_config "/dev/mtd$idx" "0x0" "0x10000" "0x10000" "1"
 	;;
+anysafe,e1)
+	ubootenv_add_mtd "0:APPSBLENV" "0x0" "0x10000" "0x10000"
+	;;
 dynalink,dl-wrx36|\
 glinet,gl-ax1800|\
 glinet,gl-axt1800|\
