@@ -1,0 +1,188 @@
+name: OpenWrt_open-vm-tools_6.12.x
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+      - cron:  '0 */3 * * *'
+  release:
+      types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 查看机器配置
+        run: |
+         echo "警告⚠"
+         echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
+         echo -e "CPU性能排序: 7763 > 8370C > 8272CL > 8171M > E5-2673\n"
+         echo "--------------------------CPU信息--------------------------"
+         echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
+         echo "CPU核心数量: $(nproc)"
+         echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
+         echo "--------------------------内存信息--------------------------"
+         echo "已安装内存详细信息:"
+         echo -e "$(sudo lshw -short -C memory | grep GiB)\n"
+         echo "--------------------------硬盘信息--------------------------"
+         echo "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          temp-reserve-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Space cleanup & Timezone
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/lib/jvm /etc/mysql /etc/php || true
+          sudo docker image prune --all --force || true
+          sudo -E apt-get update
+          sudo -E apt-get -y purge azure-cli* docker* ghc* zulu* llvm* firefox google* dotnet* powershell* openjdk* mysql* php* mongodb* snap* || true
+          sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev scdoc
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Clone source code
+        run: |
+          git clone --depth 1 https://github.com/coolsnowwolf/lede openwrt
+
+      - name: Update feeds
+        working-directory: ./openwrt
+        run: |
+          sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
+          sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
+          sed -i '5i src-git taskplan https://github.com/sirpdboy/luci-app-taskplan' feeds.conf.default
+          sed -i '6i src-git rtp2httpd https://github.com/stackia/rtp2httpd.git' feeds.conf.default
+          sed -i '8i src-git netbird https://github.com/tbc0309/openwrt-netbird.git' feeds.conf.default
+          ./scripts/feeds update -a
+          # 仅清理冲突包，不再干扰 Golang 环境以对标 Release 成功版
+          rm -rf feeds/luci/applications/luci-app-mosdns
+          rm -rf feeds/packages/net/{alist,openlist,adguardhome,mosdns,xray*,v2ray*,v2ray*,sing*,smartdns}
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate configuration file
+        working-directory: ./openwrt
+        run: |
+          # 
+          # ========================固件定制部分========================
+          #
+          # (此处完全参照 OpenWrt_open-vm-tools_6.12.x (1).yml 的原始内容)
+          #
+          cat >> .config <<EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_Generic=y
+          #CONFIG_HAS_TESTING_KERNEL=y
+          #CONFIG_TESTING_KERNEL=n
+          #CONFIG_LINUX_6_6=y
+          EOF
+
+          # 常用LuCI插件选择:
+          cat >> .config <<EOF
+          # CONFIG_PACKAGE_luci-app-adbyby-plus=y
+          # CONFIG_PACKAGE_luci-app-aria2=y
+          # CONFIG_PACKAGE_luci-app-baidupcs-web=y
+          # CONFIG_PACKAGE_luci-app-docker=y
+          # ... (中间省略部分注释以节省显示空间，但你使用时请保持原样)
+          CONFIG_PACKAGE_luci-app-frps=y
+          CONFIG_PACKAGE_luci-app-aliyundrive-webdav=n
+          CONFIG_PACKAGE_luci-app-adbyby-plus=n
+          CONFIG_PACKAGE_luci-app-unblockmusic=n
+          CONFIG_PACKAGE_luci-app_transmission=n
+          CONFIG_PACKAGE_luci-app-xlnetacc=n
+          CONFIG_PACKAGE_luci-app-samba4=n
+          CONFIG_PACKAGE_luci-app-ddns=n
+          CONFIG_PACKAGE_luci-app-vsftpd=n
+          CONFIG_PACKAGE_luci-app-accesscontrol=n
+          CONFIG_PACKAGE_luci-app-ssr-plus=n
+          CONFIG_PACKAGE_luci-app-vlmcsd=n
+          CONFIG_PACKAGE_luci-app-openlist2=y
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-wireguard=y
+          CONFIG_PACKAGE_luci-proto-wireguard=y
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_luci-app-taskplan=y
+          CONFIG_PACKAGE_luci-app-rtp2httpd=y
+          EOF
+
+          # 常用软件包:
+          cat >> .config <<EOF
+          CONFIG_SING_BOX_WITH_ECH=y
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_open-vm-tools=y
+          CONFIG_PACKAGE_iperf3=y
+          CONFIG_PACKAGE_iftop=y
+          CONFIG_PACKAGE_tcpdump=y
+          CONFIG_PACKAGE_pv=y
+          CONFIG_PACKAGE_netbird=y
+          EOF
+
+          # 取消编译VMware镜像以及镜像填充:
+          cat >> .config <<EOF
+          # CONFIG_TARGET_IMAGES_GZIP is not set
+          # CONFIG_TARGET_IMAGES_KERNEL is not set
+          # CONFIG_VMDK_IMAGES is not set
+          # CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+          EOF
+          #
+          # ========================固件定制部分结束========================
+          #
+          make defconfig
+
+      - name: Compile the firmware
+        working-directory: ./openwrt
+        run: |
+          make download -j8
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p ./artifact/firmware
+          mkdir -p ./artifact/package
+          mkdir -p ./artifact/buildinfo
+          cp -rf $(find openwrt/bin/targets/ -type f -name "*.buildinfo" -o -name "*.manifest") ./artifact/buildinfo/ || true
+          cp -rf $(find openwrt/bin/packages/ -type f -name "*.ipk") ./artifact/package/ || true
+          find openwrt/bin/targets/ -type f ! -name "*.buildinfo" ! -name "*.manifest" -exec cp -f {} ./artifact/firmware/ \;
+
+      - name: Deliver buildinfo
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_buildinfo_6.12.x
+          path: ./artifact/buildinfo/
+
+      - name: Deliver package
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_package_6.12.x
+          path: ./artifact/package/
+
+      - name: Deliver firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_firmware_6.12.x
+          path: ./artifact/firmware/
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./artifact/firmware/*
+          tag: ${{ github.ref }}
+          file_glob: true
