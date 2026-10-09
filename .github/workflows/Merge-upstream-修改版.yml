@@ -1,0 +1,49 @@
+name: Merge-upstream
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # 每小时同步一次，可按需调整
+  workflow_dispatch:       # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v5
+      with:
+        ref: master
+
+    - name: Sync upstream & keep my workflows
+      run: |
+        set -e
+        git config user.name  "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        # 1. 先把我自己的 workflows 备份出来
+        rm -rf /tmp/myworkflows
+        mkdir -p /tmp/myworkflows
+        cp -r .github/workflows/. /tmp/myworkflows/
+
+        # 2. 整体重置到上游最新代码 —— 上游永远获胜，不存在冲突解决，坏文件直接被冲掉
+        git remote add upstream https://github.com/coolsnowwolf/lede.git
+        git fetch upstream master
+        git reset --hard FETCH_HEAD
+
+        # 3. 删掉上游自带的 workflows，换回我自己的
+        rm -rf .github/workflows
+        mkdir -p .github/workflows
+        cp -r /tmp/myworkflows/. .github/workflows/
+
+        # 4. 提交差异（上游没变化、workflows 也没变时自动跳过）
+        git add -A .github/workflows
+        if [ -n "$(git status --porcelain)" ]; then
+          git commit -m "chore: sync upstream, keep custom workflows"
+        fi
+
+    - name: Push to master
+      run: git push --force-with-lease origin HEAD:master
