@@ -1,0 +1,449 @@
+name: OpenWrt_open-vm-tools_x86-64
+
+# ============================================================
+# 本文件刻意 **不含任何内核版本号**。
+# 内核版本在构建时从上游源码与真实产物自动推导：
+#   1) 编译前：解析 openwrt/target/linux/x86/Makefile 的 KERNEL_PATCHVER（上游声明的稳定版）
+#   2) 编译后：读取真实产出的 kernel_<版本>-*.ipk 文件名（例如 6.18.55）
+#   3) 两者交叉校验，不一致直接报错
+# 因此上游把 6.18 换成 6.20 时，本文件与文件名都 **不需要改动**：
+# 产物名、Release Tag、Release 资产名会自动跟着变。
+# ============================================================
+
+on:
+  push:
+    branches: [ master ]
+  schedule:
+    # 仍为每 3 小时一次；刻意从整点挪开：
+    #   - GitHub 整点是高负载时段，官方明确说明「排队任务可能被直接丢弃」，
+    #     本仓库实测整点 tick 大量落空（同 cron 的预置工作流一天 5 档只兑现 1 档）；
+    #   - 同时避开同仓库 Merge-upstream（0 * * * *）抢占整点。
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 与主流程共用的路径常量
+  TARGET_BIN: openwrt/bin/targets/x86/64
+  # 下载加速前缀；置空则只用 GitHub 直链
+  GH_PROXY: https://gh-proxy.com/
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    # 末尾要创建/更新 Release，需要写权限
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 查看机器配置
+        run: |
+         echo "警告⚠"
+         echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
+         echo -e "CPU性能排序: 7763 > 8370C > 8272CL > 8171M > E5-2673\n"
+         echo "--------------------------CPU信息--------------------------"
+         echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
+         echo "CPU核心数量: $(nproc)"
+         echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
+         echo "--------------------------内存信息--------------------------"
+         echo "已安装内存详细信息:"
+         echo -e "$(sudo lshw -short -C memory | grep GiB)\n"
+         echo "--------------------------硬盘信息--------------------------"
+         echo "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+
+      # 一次构建要同时产出 build_dir、3 个 artifact、2 个 .img.xz 与 1 个 packages.tar.xz，
+      # 根分区必须先腾出来
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          temp-reserve-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Space cleanup & Timezone
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup /usr/lib/jvm /etc/mysql /etc/php || true
+          sudo docker image prune --all --force || true
+          sudo -E apt-get update
+          sudo -E apt-get -y purge azure-cli* docker* ghc* zulu* llvm* firefox google* dotnet* powershell* openjdk* mysql* php* mongodb* snap* || true
+          sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev scdoc
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Clone source code
+        run: |
+          git clone --depth 1 https://github.com/coolsnowwolf/lede openwrt
+
+      # ---------- 版本推导（1/2）：编译前，读上游声明 ----------
+      - name: Detect upstream kernel version
+        id: ver
+        run: |
+          MK=openwrt/target/linux/x86/Makefile
+          if [ ! -f "$MK" ]; then
+            echo "::error title=源码结构变化::找不到 $MK，上游可能调整了内核版本定义位置"
+            exit 1
+          fi
+          DECLARED=$(sed -nE 's/^[[:space:]]*KERNEL_PATCHVER[[:space:]]*[:?]?=[[:space:]]*([0-9]+\.[0-9]+).*$/\1/p' "$MK" | sed -n '1p')
+          TESTING=$(sed -nE  's/^[[:space:]]*KERNEL_TESTING_PATCHVER[[:space:]]*[:?]?=[[:space:]]*([0-9]+\.[0-9]+).*$/\1/p' "$MK" | sed -n '1p')
+          echo "上游声明：稳定内核 = ${DECLARED:-未解析到} / 测试内核 = ${TESTING:-未解析到}"
+          if [ -z "$DECLARED" ]; then
+            echo "::error title=内核版本解析失败::未能从 $MK 解析出 KERNEL_PATCHVER"
+            exit 1
+          fi
+          echo "declared=$DECLARED" >> "$GITHUB_OUTPUT"
+
+      - name: Update feeds
+        working-directory: ./openwrt
+        run: |
+          sed -i '1i src-git lucky https://github.com/gdy666/luci-app-lucky' feeds.conf.default
+          sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+          sed -i '3i src-git openlist2 https://github.com/sbwml/luci-app-openlist2' feeds.conf.default
+          sed -i '4i src-git vmware https://github.com/vmware/open-vm-tools' feeds.conf.default
+          sed -i '5i src-git taskplan https://github.com/sirpdboy/luci-app-taskplan' feeds.conf.default
+          sed -i '6i src-git rtp2httpd https://github.com/stackia/rtp2httpd.git' feeds.conf.default
+          sed -i '8i src-git netbird https://github.com/tbc0309/openwrt-netbird.git' feeds.conf.default
+          ./scripts/feeds update -a
+          # 仅清理冲突包，不再干扰 Golang 环境
+          rm -rf feeds/luci/applications/luci-app-mosdns
+          rm -rf feeds/packages/net/{alist,openlist,adguardhome,mosdns,xray*,v2ray*,v2ray*,sing*,smartdns}
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate configuration file
+        working-directory: ./openwrt
+        run: |
+          #
+          # ========================固件定制部分========================
+          #
+          cat >> .config <<EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          # x86/64 只有一个设备 generic（target/linux/x86/image/64.mk: TARGET_DEVICES += generic），
+          # 对应符号就是 ..._DEVICE_generic；旧的 ..._Generic 是失效的 profile 拼法会被静默丢弃
+          CONFIG_TARGET_x86_64_DEVICE_generic=y
+          EOF
+
+          # 常用LuCI插件选择:
+          cat >> .config <<EOF
+          # CONFIG_PACKAGE_luci-app-adbyby-plus=y
+          # CONFIG_PACKAGE_luci-app-aria2=y
+          # CONFIG_PACKAGE_luci-app-baidupcs-web=y
+          # CONFIG_PACKAGE_luci-app-docker=y
+          # ... (中间省略部分注释以节省显示空间，但你使用时请保持原样)
+          CONFIG_PACKAGE_luci-app-frps=y
+          CONFIG_PACKAGE_luci-app-aliyundrive-webdav=n
+          CONFIG_PACKAGE_luci-app-adbyby-plus=n
+          CONFIG_PACKAGE_luci-app-unblockmusic=n
+          CONFIG_PACKAGE_luci-app_transmission=n
+          CONFIG_PACKAGE_luci-app-xlnetacc=n
+          CONFIG_PACKAGE_luci-app-samba4=n
+          CONFIG_PACKAGE_luci-app-ddns=n
+          CONFIG_PACKAGE_luci-app-vsftpd=n
+          CONFIG_PACKAGE_luci-app-accesscontrol=n
+          CONFIG_PACKAGE_luci-app-ssr-plus=n
+          CONFIG_PACKAGE_luci-app-vlmcsd=n
+          CONFIG_PACKAGE_luci-app-openlist2=y
+          CONFIG_PACKAGE_luci-app-lucky=y
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-wireguard=y
+          CONFIG_PACKAGE_luci-proto-wireguard=y
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_luci-app-taskplan=y
+          CONFIG_PACKAGE_luci-app-rtp2httpd=y
+          EOF
+
+          # 常用软件包:
+          cat >> .config <<EOF
+          CONFIG_SING_BOX_WITH_ECH=y
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_open-vm-tools=y
+          CONFIG_PACKAGE_iperf3=y
+          CONFIG_PACKAGE_iftop=y
+          CONFIG_PACKAGE_tcpdump=y
+          CONFIG_PACKAGE_pv=y
+          CONFIG_PACKAGE_netbird=y
+          CONFIG_PACKAGE_wireguard-tools=y
+          EOF
+
+          # ---- 镜像格式 / 引导方式 / 分区尺寸 ----
+          # 1) 必须关掉 TARGET_IMAGES_GZIP（源码里 default y），否则产出 .img.gz，
+          #    后面再 xz 就成了"gzip 套 xz"的双重压缩，文件名 .img.xz 撒谎
+          # 2) GRUB_IMAGES 默认 n，不显式打开就没有传统 BIOS 版 combined.img
+          # 3) 分区尺寸显式锁定，免得上游改默认值后体积漂移
+          cat >> .config <<EOF
+          # CONFIG_TARGET_IMAGES_GZIP is not set
+          # CONFIG_TARGET_IMAGES_KERNEL is not set
+          # CONFIG_TARGET_ROOTFS_INITRAMFS is not set
+          # CONFIG_VMDK_IMAGES is not set
+          CONFIG_GRUB_IMAGES=y
+          CONFIG_GRUB_EFI_IMAGES=y
+          CONFIG_TARGET_KERNEL_PARTSIZE=64
+          CONFIG_TARGET_ROOTFS_PARTSIZE=448
+          EOF
+
+          # ---- 内核系列锁定：跟随上游稳定版 ----
+          # 依据 target/linux/x86/Makefile：KERNEL_PATCHVER=稳定版 / KERNEL_TESTING_PATCHVER=测试版；
+          # include/kernel-version.mk 里 CONFIG_TESTING_KERNEL 一置位就会切到测试版。
+          # 所以"跟随上游默认"的做法就是确保它未被置位 —— 这里不含任何版本号，
+          # 上游把稳定版从 6.18 升到 6.20 时本文件无需改动。
+          sed -i -e '/^CONFIG_TESTING_KERNEL=/d' \
+                 -e '/^# CONFIG_TESTING_KERNEL is not set$/d' \
+                 -e '/^CONFIG_HAS_TESTING_KERNEL=/d' \
+                 -e '/^# CONFIG_HAS_TESTING_KERNEL is not set$/d' .config
+          cat >> .config <<EOF
+          # CONFIG_HAS_TESTING_KERNEL is not set
+          # CONFIG_TESTING_KERNEL is not set
+          EOF
+          #
+          # ========================固件定制部分结束========================
+          #
+          make defconfig
+
+          echo '::group::关键开关回显'
+          grep -E '^CONFIG_(TARGET_x86_64_DEVICE_generic|GRUB_IMAGES|GRUB_EFI_IMAGES|TARGET_KERNEL_PARTSIZE|TARGET_ROOTFS_PARTSIZE)=' .config || true
+          grep -E '^# CONFIG_(TESTING_KERNEL|TARGET_IMAGES_GZIP) is not set$' .config || echo '(注意：未看到预期的反选行)'
+          echo '::endgroup::'
+
+          # 编译前拦下致命错配，不浪费后面的编译时间。
+          # 判据必须查"目标符号是否为 y"，不能查"反选行是否存在"——反选行是我们自己写进去的，永远存在。
+          if grep -qE '^CONFIG_TESTING_KERNEL=y' .config; then
+            echo '::error title=内核配置错误::CONFIG_TESTING_KERNEL 被置位，内核会切到上游测试版'
+            exit 1
+          fi
+          if grep -qE '^CONFIG_TARGET_IMAGES_GZIP=y' .config; then
+            echo '::error title=镜像格式错误::TARGET_IMAGES_GZIP 仍是 y，镜像会是 .img.gz 导致双重压缩'
+            exit 1
+          fi
+          if ! grep -qE '^CONFIG_TARGET_x86_64_DEVICE_generic=y' .config; then
+            echo '::error title=设备符号缺失::CONFIG_TARGET_x86_64_DEVICE_generic 未置位'
+            exit 1
+          fi
+
+      - name: Compile the firmware
+        working-directory: ./openwrt
+        run: |
+          make download -j8
+          make -j$(nproc) || make -j1 V=s
+
+      # ---------- 版本推导（2/2）：编译后，读真实产物并交叉校验 ----------
+      - name: Verify kernel version
+        id: kernel
+        run: |
+          set -euo pipefail
+          FULL=$(find "$TARGET_BIN/packages" -maxdepth 1 -name 'kernel_*.ipk' -printf '%f\n' \
+                 | sort | sed -n '1p' | sed -E 's/^kernel_([0-9]+\.[0-9]+\.[0-9]+)-.*$/\1/')
+          if [ -z "$FULL" ]; then
+            echo "::error title=内核版本读取失败::未在 $TARGET_BIN/packages 找到 kernel_*.ipk"
+            exit 1
+          fi
+          case "$FULL" in
+            *.*.*) SERIES="${FULL%.*}" ;;
+            *)     SERIES="$FULL" ;;
+          esac
+          DECLARED="${{ steps.ver.outputs.declared }}"
+          echo "上游声明内核=$DECLARED / 实际编译内核=$FULL / 系列=$SERIES"
+          if [ "$DECLARED" != "$SERIES" ]; then
+            echo "::error title=内核与上游声明不一致::上游 KERNEL_PATCHVER=$DECLARED，实际产出 $FULL"
+            exit 1
+          fi
+          {
+            echo "full=$FULL"
+            echo "series=$SERIES"
+          } >> "$GITHUB_OUTPUT"
+
+      # ============================================================
+      # 产物分拣
+      #   bin/targets/x86/64 顶层才是固件镜像；
+      #   packages/ 子目录是该目标的 opkg 软件源（不属于固件产物）
+      # ============================================================
+      - name: Prepare artifact
+        run: |
+          set -euo pipefail
+
+          # ---- 只保留哪种镜像，改这一行即可 ----
+          # 该通配符同时命中两种整盘镜像：
+          #   openwrt-x86-64-generic-squashfs-combined.img       ← 传统 BIOS 引导
+          #   openwrt-x86-64-generic-squashfs-combined-efi.img   ← UEFI 引导
+          #   想连 rootfs 分区镜像与 kernel.bin 一起收：
+          #     FW_NAME_1='*.img'  并追加  -o -name '*.bin'
+          FW_NAME_1='*-combined*.img'
+          FW_NAME_2='*-combined*.img.gz'
+
+          rm -rf ./artifact
+          mkdir -p ./artifact/firmware ./artifact/package ./artifact/buildinfo
+
+          echo '::group::1/3 buildinfo'
+          find "$TARGET_BIN" -maxdepth 1 -type f \
+            \( -name '*.buildinfo' -o -name '*.manifest' \) \
+            -exec cp -f -t ./artifact/buildinfo/ {} +
+          ls -1 ./artifact/buildinfo
+          echo '::endgroup::'
+
+          echo '::group::2/3 package'
+          find openwrt/bin/packages -type f -name '*.ipk' \
+            -exec cp -f -t ./artifact/package/ {} +
+          echo "package 数量: $(find ./artifact/package -type f | wc -l)"
+          echo '::endgroup::'
+
+          echo '::group::3/3 firmware'
+          find "$TARGET_BIN" -maxdepth 1 -type f \
+            \( -name "$FW_NAME_1" -o -name "$FW_NAME_2" \) \
+            ! -name 'Packages*' ! -name 'profiles.json' ! -name 'sha256sums' ! -name '*.ipk' \
+            -exec cp -f -t ./artifact/firmware/ {} +
+          ls -lh ./artifact/firmware
+          if ! ls ./artifact/firmware/*-combined.img >/dev/null 2>&1; then
+            echo '::warning title=缺少 BIOS 版镜像::未找到 *-combined.img，请检查 CONFIG_GRUB_IMAGES 是否生效'
+          fi
+          echo '::endgroup::'
+
+          if [ -z "$(ls -A ./artifact/firmware)" ]; then
+            echo '::error title=firmware artifact empty::固件镜像收集为空，请检查 TARGET_BIN 路径与镜像开关'
+            exit 1
+          fi
+
+      # 产物名带上真实内核版本，一眼看出是哪次上游产物
+      - name: Deliver buildinfo
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_buildinfo_${{ steps.kernel.outputs.full }}
+          path: ./artifact/buildinfo/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Deliver package
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_package_${{ steps.kernel.outputs.full }}
+          path: ./artifact/package/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Deliver firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt_firmware_${{ steps.kernel.outputs.full }}
+          path: ./artifact/firmware/
+          if-no-files-found: error
+          retention-days: 7
+
+      # ============================================================
+      # Release 打包：文件名里带真实内核版本
+      # ============================================================
+      - name: Pack release assets
+        id: pack
+        run: |
+          set -euo pipefail
+          FULL="${{ steps.kernel.outputs.full }}"
+          OUT=./artifact/release_upload
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          PREFIX="openwrt-${FULL}-x86-64"
+
+          # 找不到镜像必须报错。旧写法用 [ -n "$FW" ] 判断，
+          # 缺镜像时会静默跳过，最终 Release 里只剩一个 packages 包而流水线还是绿的。
+          pack() {
+            local glob="$1" name="$2" desc="$3" f
+            f=$(find "$TARGET_BIN" -maxdepth 1 -type f -name "$glob" | sort | sed -n '1p')
+            if [ -z "$f" ]; then
+              echo "::error title=缺少镜像[$desc]::未在 $TARGET_BIN 找到 $glob。若已开启 TARGET_IMAGES_GZIP，产物会是 .img.gz，请先关掉它"
+              return 1
+            fi
+            echo "压缩【$desc】<- $f"
+            xz -9 -c "$f" > "$OUT/$name"
+          }
+
+          pack '*-combined.img'     "$PREFIX-bios.img.xz" '传统 BIOS 版 combined.img'
+          pack '*-combined-efi.img' "$PREFIX-efi.img.xz"  'UEFI 版 combined-efi.img'
+
+          echo "打包 opkg 软件源"
+          PKG="packages-${FULL}-x86.tar.xz"
+          tar -cJf "$OUT/$PKG" -C openwrt/bin/packages/ .
+
+          echo "生成校验和"
+          ( cd "$OUT" && sha256sum *.xz > sha256sums.txt )
+
+          echo "fw_bios=${PREFIX}-bios.img.xz" >> "$GITHUB_OUTPUT"
+          echo "fw_efi=${PREFIX}-efi.img.xz"   >> "$GITHUB_OUTPUT"
+          echo "fw_pkg=${PKG}"                 >> "$GITHUB_OUTPUT"
+
+          echo '::group::release 产物'
+          ls -lh "$OUT"
+          echo '::endgroup::'
+
+      - name: Collect Release Info
+        id: info
+        run: |
+          echo "date=$(date +'%Y-%m-%d %H:%M')" >> "$GITHUB_OUTPUT"
+          TAG="v${{ steps.kernel.outputs.series }}-Latest"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "url_bios=${BASE}/${{ steps.pack.outputs.fw_bios }}" >> "$GITHUB_OUTPUT"
+          echo "url_efi=${BASE}/${{ steps.pack.outputs.fw_efi }}"   >> "$GITHUB_OUTPUT"
+          echo "url_pkg=${BASE}/${{ steps.pack.outputs.fw_pkg }}"   >> "$GITHUB_OUTPUT"
+          echo "proxy_bios=${GH_PROXY}${BASE}/${{ steps.pack.outputs.fw_bios }}" >> "$GITHUB_OUTPUT"
+          echo "proxy_efi=${GH_PROXY}${BASE}/${{ steps.pack.outputs.fw_efi }}"   >> "$GITHUB_OUTPUT"
+          echo "proxy_pkg=${GH_PROXY}${BASE}/${{ steps.pack.outputs.fw_pkg }}"   >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./artifact/release_upload/*
+          tag: ${{ steps.info.outputs.tag }}
+          release_name: "OpenWrt x86-64 [Linux ${{ steps.kernel.outputs.full }}] - ${{ steps.info.outputs.date }}"
+          overwrite: true
+          file_glob: true
+          body: |
+            ## 🚀 OpenWrt x86-64（内核 `${{ steps.kernel.outputs.full }}`）
+
+            - **内核**: `${{ steps.kernel.outputs.full }}`（上游稳定版，系列 `${{ steps.kernel.outputs.series }}`）
+            - **架构**: `x86-64` generic
+            - **构建时间**: `${{ steps.info.outputs.date }}`
+            - **构建产物**: [Actions Artifacts](https://github.com/${{ github.repository }}/actions)
+
+            ### 下载
+
+            | 类别 | 文件 | 直链 | 加速 |
+            | --- | --- | --- | --- |
+            | 传统 BIOS | `${{ steps.pack.outputs.fw_bios }}` | [下载](${{ steps.info.outputs.url_bios }}) | [加速](${{ steps.info.outputs.proxy_bios }}) |
+            | UEFI | `${{ steps.pack.outputs.fw_efi }}` | [下载](${{ steps.info.outputs.url_efi }}) | [加速](${{ steps.info.outputs.proxy_efi }}) |
+            | opkg 软件源 | `${{ steps.pack.outputs.fw_pkg }}` | [下载](${{ steps.info.outputs.url_pkg }}) | [加速](${{ steps.info.outputs.proxy_pkg }}) |
+
+            > **镜像刷写**: 先 `xz -d 文件名.img.xz` 得到 `.img`，再按虚机的引导方式选对应镜像写盘。
+            > BIOS 引导的虚机用 `bios` 版，开启了 EFI 的用 `efi` 版，选错开不了机。
+            >
+            > **软件源**: `packages-*.tar.xz` 解压后可作为本地 opkg 源使用。
+            >
+            > 全部资产的校验值见 `sha256sums.txt`。
+
+      # 资产名带版本号，不做清理会在同一 Tag 下越堆越多（每次约 580MB）
+      - name: Prune stale assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          TAG="${{ steps.info.outputs.tag }}"
+          HAVEFILE=$(mktemp)
+          KEEPFILE=$(mktemp)
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' > "$HAVEFILE" 2>/dev/null; then
+            echo "Release $TAG 不存在，跳过清理"
+            exit 0
+          fi
+          ls -1 ./artifact/release_upload > "$KEEPFILE"
+          while IFS= read -r n; do
+            [ -z "$n" ] && continue
+            if grep -qxF "$n" "$KEEPFILE"; then continue; fi
+            echo "清理历史资产: $n"
+            gh release delete-asset "$TAG" "$n" --repo "$GITHUB_REPOSITORY" --yes || true
+          done < "$HAVEFILE"
